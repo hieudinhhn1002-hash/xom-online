@@ -1,0 +1,42 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>XÓM ONLINE · Multiplayer</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101927;color:#edf5fb;font:14px system-ui}header{padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#172638;border-bottom:1px solid #31475b}.brand{font-size:25px;font-weight:1000;letter-spacing:2px;color:#ffd66b}.tag{color:#9bb4c9}main{max-width:1250px;margin:auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px}.panel{background:#1a2b3e;border:1px solid #344c63;border-radius:15px;padding:14px}.world{position:relative;background:#8acb83;border:3px solid #3c566d;border-radius:15px;overflow:hidden}canvas{width:100%;display:block;image-rendering:pixelated}.login{position:absolute;inset:0;background:#102033dd;display:flex;align-items:center;justify-content:center;padding:20px}.loginbox{width:min(360px,100%);background:#20364b;border:1px solid #58728b;border-radius:16px;padding:22px;text-align:center}.login input,.chatbar input{width:100%;padding:12px;border-radius:9px;border:1px solid #607b95;background:#132538;color:white;margin:8px 0}.btn{background:#ffd66b;border:0;border-radius:9px;padding:11px 14px;font-weight:900;cursor:pointer;color:#382b0c}.side{display:flex;flex-direction:column;gap:12px}h3{color:#ffd66b;margin:0 0 10px}.muted{color:#9bb4c9;font-size:12px}.chatlog{height:220px;overflow:auto;background:#122236;border-radius:10px;padding:9px;font-size:12px;line-height:1.6}.chatbar{display:flex;gap:6px}.chatbar input{flex:1;min-width:0}.chatbar button{margin-top:8px}.status{color:#9be3b0;font-weight:700}footer{max-width:1250px;margin:auto;padding:0 16px 18px;color:#91a8bc}@media(max-width:850px){main{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.chatlog{height:150px}}@media(max-width:520px){.side{display:flex}}
+</style></head><body>
+<header><div><div class="brand">🏘️ XÓM ONLINE</div><div class="tag">Việt Nam thu nhỏ · Multiplayer thử nghiệm</div></div><div class="status" id="status">● Đang kết nối…</div></header>
+<main><section class="world"><canvas id="game" width="960" height="600"></canvas><div class="login" id="login"><div class="loginbox"><h2>Vào xóm thôi! 🌿</h2><p class="muted">Chọn tên hiển thị để gặp hàng xóm.</p><input id="name" maxlength="18" placeholder="Tên nhân vật" value="Đại Ka"><button class="btn" id="join">VÀO XÓM</button><p class="muted">WASD / phím mũi tên để di chuyển</p></div></div></section>
+<aside class="side"><div class="panel"><h3>📍 Khu Chợ Xóm</h3><div class="muted">Người trong phòng: <b id="count">0</b></div><p>Đi dạo, chào hàng xóm và tám chuyện. Xóm đang mở cửa!</p></div><div class="panel"><h3>💬 Trà đá đầu ngõ</h3><div class="chatlog" id="chat"></div><div class="chatbar"><input id="msg" maxlength="180" placeholder="Nói gì đó với xóm…"><button class="btn" id="send">Gửi</button></div></div><div class="panel"><h3>🎮 Điều khiển</h3><p><b>WASD / ← ↑ → ↓</b>: đi lại</p><p><b>Enter</b>: chat</p><p class="muted">Bản multiplayer thử nghiệm: vị trí và chat được đồng bộ qua server.</p></div></aside></main><footer>Prototype multiplayer · Không nhập thông tin nhạy cảm · Hãy cư xử văn minh với hàng xóm.</footer>
+<script src="/socket.io/socket.io.js"></script><script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),socket=io();
+const players=new Map();let me=null,keys={},lastSend=0;
+const status=document.getElementById('status'),login=document.getElementById('login'),chat=document.getElementById('chat');
+function say(s){chat.innerHTML+=`<div>${s}</div>`;chat.scrollTop=chat.scrollHeight}
+function draw(){
+ ctx.clearRect(0,0,960,600);ctx.fillStyle='#9bd18b';ctx.fillRect(0,0,960,600);
+ // roads
+ ctx.fillStyle='#777d80';ctx.fillRect(0,255,960,120);ctx.fillRect(420,0,120,600);
+ ctx.fillStyle='#e8d7a6';for(let x=0;x<960;x+=70)ctx.fillRect(x,310,35,4);for(let y=0;y<600;y+=70)ctx.fillRect(478,y,4,35);
+ // buildings
+ const b=(x,y,w,h,c,label)=>{ctx.fillStyle='#4d6257';ctx.fillRect(x+5,y+8,w,h);ctx.fillStyle=c;ctx.fillRect(x,y,w,h);ctx.fillStyle='#f6e8c8';ctx.fillRect(x+12,y+18,w-24,20);ctx.fillStyle='#34465a';ctx.fillRect(x+18,y+50,25,35);ctx.fillRect(x+w-45,y+50,25,35);ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';ctx.fillText(label,x+12,y+31)};
+ b(65,55,220,150,'#df9e70','TẠP HÓA CÔ BA');b(650,60,230,145,'#d7bd7d','BÚN BÒ');b(65,410,240,130,'#91b8d9','NHÀ VĂN HÓA');b(665,420,210,120,'#d79bb1','TIỆM NET 88');
+ // trees + tea
+ for(const [x,y] of [[350,100],[600,180],[330,480],[600,480],[900,250]]){ctx.fillStyle='#79533a';ctx.fillRect(x-5,y,10,22);ctx.fillStyle='#267b4c';ctx.beginPath();ctx.arc(x,y,23,0,7);ctx.fill()}
+ ctx.fillStyle='#b67d4b';ctx.fillRect(570,395,100,38);ctx.fillStyle='#f5e4c7';ctx.fillText('TRÀ ĐÁ',590,418);
+ for(const p of players.values()){ctx.fillStyle=p.color||'#f5b46b';ctx.fillRect(p.x-10,p.y-17,20,26);ctx.fillStyle='#27394b';ctx.fillRect(p.x-10,p.y+8,8,10);ctx.fillRect(p.x+2,p.y+8,8,10);ctx.fillStyle='#fff';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText(p.name,p.x,p.y-24);ctx.textAlign='left'}
+ requestAnimationFrame(draw)
+}
+draw();
+socket.on('connect',()=>status.textContent='● Đã kết nối server');
+socket.on('disconnect',()=>status.textContent='● Mất kết nối');
+socket.on('welcome',d=>{me=d.self;players.clear();d.players.forEach(p=>players.set(p.id,p));login.style.display='none';document.getElementById('count').textContent=players.size;say('🌿 Bạn đã vào Xóm Online!')});
+socket.on('playerJoined',p=>{players.set(p.id,p);document.getElementById('count').textContent=players.size;say('👋 '+p.name+' vừa vào xóm')});
+socket.on('playerMoved',p=>{let q=players.get(p.id);if(q){q.x=p.x;q.y=p.y}});
+socket.on('playerLeft',id=>{players.delete(id);document.getElementById('count').textContent=players.size});
+socket.on('chat',m=>say(`<b>${m.name}:</b> ${escapeHtml(m.text)}`));socket.on('system',s=>say('🔔 '+escapeHtml(s)));
+function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+document.getElementById('join').onclick=()=>socket.emit('join',{name:document.getElementById('name').value});
+function send(){let i=document.getElementById('msg');if(i.value.trim())socket.emit('chat',i.value.trim());i.value=''}
+document.getElementById('send').onclick=send;document.getElementById('msg').onkeydown=e=>{if(e.key==='Enter')send()};
+document.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Enter'&&document.activeElement!==document.getElementById('msg'))document.getElementById('msg').focus()});
+document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+setInterval(()=>{if(!me)return;let dx=0,dy=0;if(keys.w||keys.arrowup)dy-=1;if(keys.s||keys.arrowdown)dy+=1;if(keys.a||keys.arrowleft)dx-=1;if(keys.d||keys.arrowright)dx+=1;if(dx||dy){me.x+=dx*3;me.y+=dy*3;me.x=Math.max(15,Math.min(945,me.x));me.y=Math.max(20,Math.min(580,me.y));let p=players.get(me.id);if(p){p.x=me.x;p.y=me.y}socket.emit('move',{x:me.x,y:me.y})}},35);
+</script></body></html>
